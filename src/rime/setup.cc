@@ -87,11 +87,12 @@ RIME_API void SetupLogging(const char* app_name,
   // Do not allow other users to read/write log files created by current
   // process.
   FLAGS_logfile_mode = 0600;
-  if (google::IsGoogleLoggingInitialized()) {
-    LOG(WARNING) << "Glog is already initialized.";
-  } else {
-    google::InitGoogleLogging(app_name);
-  }
+  // if (google::IsGoogleLoggingInitialized()) {
+  //   LOG(WARNING) << "Glog is already initialized.";
+  // } else {
+  //   google::InitGoogleLogging(app_name);
+  // }
+  google::InitGoogleLogging(app_name);
 #endif  // RIME_ENABLE_LOGGING
 }
 
