@@ -1,6 +1,3 @@
-#set(CMAKE_USER_MAKE_RULES_OVERRIDE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/c_flag_overrides.cmake)
-#set(CMAKE_USER_MAKE_RULES_OVERRIDE_CXX ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cxx_flag_overrides.cmake)
-
 cmake_minimum_required(VERSION 3.12)
 project(rime)
 set(CMAKE_CXX_STANDARD 17)
@@ -18,10 +15,8 @@ option(BUILD_STATIC "Build with dependencies as static libraries" OFF)
 option(BUILD_DATA "Build data for Rime" OFF)
 option(BUILD_SAMPLE "Build sample Rime plugin" OFF)
 option(BUILD_TEST "Build and run tests" ON)
-option(BUILD_SEPARATE_LIBS "Build separate rime-* libraries" OFF)
-option(ENABLE_LOGGING "Enable logging with google-glog library" OFF)
-option(ALSO_LOG_TO_STDERR "Log to stderr as well as log file" OFF)
-option(ENABLE_ASAN "Enable Address Sanitizer (Unix Only)" OFF)
+#option(BUILD_SEPARATE_LIBS "Build separate rime-* libraries" OFF)
+#option(ENABLE_ASAN "Enable Address Sanitizer (Unix Only)" OFF)
 option(INSTALL_PRIVATE_HEADERS "Install private headers (usually needed for externally built Rime plugins)" OFF)
 option(ENABLE_EXTERNAL_PLUGINS "Enable loading of externally built Rime plugins (from directory set by RIME_PLUGINS_DIR variable)" OFF)
 option(ENABLE_THREADING "Enable threading for deployer" ON)
@@ -29,26 +24,20 @@ option(ENABLE_TIMESTAMP "Embed timestamp to schema artifacts" ON)
 
 set(RIME_DATA_DIR "rime-data" CACHE STRING "Target directory for Rime data")
 set(RIME_PLUGINS_DIR "rime-plugins" CACHE STRING "Target directory for externally built Rime plugins")
+configure_file("${PROJECT_SOURCE_DIR}/src/rime/build_config.h.in" "${PROJECT_BINARY_DIR}/src/rime/build_config.h")
 
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
-set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "${PROJECT_SOURCE_DIR}")
+set(Boost_DIR "/home/jiaopan/packages/boost-1.84.0")
+set(LevelDB_DIR "/home/jiaopan/packages/leveldb")
+set(MarisaTrie_DIR "/home/jiaopan/packages/marisa-trie")
+set(OPENCC_DIR "/home/jiaopan/packages/OpenCC")
+set(YamlCpp_DIR "/home/jiaopan/packages/yaml-cpp")
 
-
-set(Boost_USE_STATIC_LIBS ${BUILD_STATIC})
-set(Gflags_STATIC ${BUILD_STATIC})
-set(Glog_STATIC ${BUILD_STATIC})
-set(LevelDb_STATIC ${BUILD_STATIC})
-set(Marisa_STATIC ${BUILD_STATIC})
-set(Opencc_STATIC ${BUILD_STATIC})
-set(YamlCpp_STATIC ${BUILD_STATIC})
-
-set(Boost_Dir "/home/jiaopan/packages/boost-1.84.0")
-include_directories(${Boost_Dir})
+include_directories(${Boost_DIR} ${LevelDB_DIR}/include ${MarisaTrie_DIR}/include ${OPENCC_DIR}/src ${YamlCpp_DIR}/include)
+link_directories(${LevelDB_DIR}/build ${MarisaTrie_DIR}/build ${OPENCC_DIR}/build/src ${YamlCpp_DIR}/build)
 add_definitions(-DBOOST_DLL_USE_STD_FS)
 
 find_package(Threads)
-
 if(NOT ENABLE_THREADING)
   add_definitions(-DRIME_NO_THREADING)
 endif()
@@ -65,32 +54,6 @@ if(BUILD_TEST)
   endif()
 endif()
 
-find_package(YamlCpp REQUIRED)
-if(YamlCpp_FOUND)
-  include_directories(${YamlCpp_INCLUDE_PATH})
-endif()
-if(YamlCpp_STATIC)
-  add_definitions(-DYAML_CPP_STATIC_DEFINE)
-endif()
-
-find_package(LevelDb REQUIRED)
-if(LevelDb_FOUND)
-    include_directories(${LevelDb_INCLUDE_PATH})
-endif()
-
-find_package(Marisa REQUIRED)
-if(Marisa_FOUND)
-  include_directories(${Marisa_INCLUDE_PATH})
-endif()
-
-find_package(Opencc REQUIRED)
-if(Opencc_FOUND)
-include_directories(${Opencc_INCLUDE_PATH})
-endif()
-if(Opencc_STATIC)
-  add_definitions(-DOpencc_BUILT_AS_STATIC)
-endif()
-
 find_path(X11Keysym X11/keysym.h)
 if(X11Keysym)
   message(STATUS "Found X11/keysym.h at ${X11Keysym}")
@@ -99,68 +62,21 @@ else()
   message(WARNING "X11/keysym.h not found.")
 endif()
 
-configure_file(
-  "${PROJECT_SOURCE_DIR}/src/rime/build_config.h.in"
-  "${PROJECT_BINARY_DIR}/src/rime/build_config.h")
 
 include_directories(${PROJECT_BINARY_DIR}/src)
 include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_SOURCE_DIR}/include)
-#link_directories(${PROJECT_SOURCE_DIR}/lib)
 
-
-# keep these variables lest some Rime plugin's cmake file is still using them {
-if(NOT DEFINED LIB_INSTALL_DIR)
-    set(LIB_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR})
-endif()
-
-if(NOT DEFINED BIN_INSTALL_DIR)
-    set(BIN_INSTALL_DIR ${CMAKE_INSTALL_BINDIR})
-endif()
-# }
-
-# remove target
-configure_file(
-  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/cmake_uninstall.cmake.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
-  IMMEDIATE @ONLY)
-add_custom_target(remove
-  COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
-
-if(${CMAKE_SYSTEM_NAME} MATCHES "Linux|FreeBSD|OpenBSD|DragonFly|GNU|Darwin" OR MINGW)
-  set(prefix "${CMAKE_INSTALL_PREFIX}")
-  set(exec_prefix "${CMAKE_INSTALL_PREFIX}")
-  set(bindir "${CMAKE_INSTALL_FULL_BINDIR}")
-  set(libdir "${CMAKE_INSTALL_FULL_LIBDIR}")
-  set(pkgdatadir "${CMAKE_INSTALL_FULL_DATADIR}/${RIME_DATA_DIR}")
-  set(pluginsdir "${CMAKE_INSTALL_FULL_LIBDIR}/${RIME_PLUGINS_DIR}")
-  set(includedir "${CMAKE_INSTALL_FULL_INCLUDEDIR}")
-  configure_file(
-      ${PROJECT_SOURCE_DIR}/rime.pc.in
-      ${PROJECT_BINARY_DIR}/rime.pc
-      @ONLY)
-  install(FILES ${PROJECT_BINARY_DIR}/rime.pc
-    DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR}/pkgconfig)
-endif()
-
-install(FILES cmake/RimeConfig.cmake
-  DESTINATION ${CMAKE_INSTALL_FULL_DATADIR}/cmake/rime)
 
 file(GLOB rime_public_header_files ${PROJECT_SOURCE_DIR}/src/*.h)
 list(FILTER rime_public_header_files EXCLUDE REGEX .*_impl\.h$)
-install(FILES ${rime_public_header_files}
-  DESTINATION ${CMAKE_INSTALL_FULL_INCLUDEDIR})
+install(FILES ${rime_public_header_files} DESTINATION ${CMAKE_INSTALL_FULL_INCLUDEDIR})
 if(INSTALL_PRIVATE_HEADERS)
-  file(GLOB rime_private_header_files
-    ${PROJECT_SOURCE_DIR}/src/rime/*.h
-    ${PROJECT_BINARY_DIR}/src/rime/*.h)
-  install(FILES ${rime_private_header_files}
-    DESTINATION ${CMAKE_INSTALL_FULL_INCLUDEDIR}/rime)
+  file(GLOB rime_private_header_files ${PROJECT_SOURCE_DIR}/src/rime/*.h ${PROJECT_BINARY_DIR}/src/rime/*.h)
+  install(FILES ${rime_private_header_files} DESTINATION ${CMAKE_INSTALL_FULL_INCLUDEDIR}/rime)
   foreach(rime_private_header_files_dir algo config dict gear lever)
-    file(GLOB rime_private_header_files
-      ${PROJECT_SOURCE_DIR}/src/rime/${rime_private_header_files_dir}/*.h)
-    install(FILES ${rime_private_header_files}
-      DESTINATION ${CMAKE_INSTALL_FULL_INCLUDEDIR}/rime/${rime_private_header_files_dir})
+    file(GLOB rime_private_header_files ${PROJECT_SOURCE_DIR}/src/rime/${rime_private_header_files_dir}/*.h)
+    install(FILES ${rime_private_header_files} DESTINATION ${CMAKE_INSTALL_FULL_INCLUDEDIR}/rime/${rime_private_header_files_dir})
   endforeach()
 endif()
 
@@ -172,11 +88,6 @@ endif()
 if(BUILD_SHARED_LIBS)
   add_definitions(-DRIME_BUILD_SHARED_LIBS)
   set(rime_library rime)
-  if(BUILD_SEPARATE_LIBS)
-    set(rime_dict_library rime-dict)
-    set(rime_gears_library rime-gears)
-    set(rime_levers_library rime-levers)
-  endif()
 else()
   set(rime_library rime-static)
 endif()
@@ -189,19 +100,18 @@ foreach(mod ${rime_plugins_modules})
   set(list "${list},Q(${mod})")
 endforeach()
 add_definitions(-DRIME_EXTRA_MODULES=${list})
-if(BUILD_SHARED_LIBS AND BUILD_SEPARATE_LIBS AND rime_plugins_objs)
-  set(rime_plugins_library rime-plugins)
-endif()
+# if(BUILD_SHARED_LIBS AND BUILD_SEPARATE_LIBS AND rime_plugins_objs)
+#   set(rime_plugins_library rime-plugins)
+# endif()
 
-add_subdirectory(src)
+#build rime lib
+add_subdirectory(src) 
 
 if(BUILD_SHARED_LIBS)
   add_subdirectory(tools)
-
   if(BUILD_TEST)
     add_subdirectory(test)
   endif()
-
   if (BUILD_SAMPLE)
     add_subdirectory(sample)
   endif()
